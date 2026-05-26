@@ -1,50 +1,47 @@
 import streamlit as st
 import google.generativeai as genai
 
-# إعداد الربط مع Gemini
-try:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    model = genai.GenerativeModel('gemini-pro')
-except Exception as e:
-    st.error("خطأ في إعدادات API. تأكد من ضبط الـ Secrets.")
-
 def run_assistant():
     st.subheader("🤖 مساعد MEDMEC الذكي")
 
+    # 1. فحص وجود المفتاح في الـ Secrets
+    if "GOOGLE_API_KEY" not in st.secrets:
+        st.error("لم يتم العثور على GOOGLE_API_KEY في إعدادات الـ Secrets. يرجى إضافته في صفحة إعدادات Streamlit.")
+        return
+
+    # 2. إعداد الاتصال
+    try:
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        model = genai.GenerativeModel('gemini-pro')
+    except Exception as e:
+        st.error(f"خطأ في إعداد الاتصال بـ Gemini: {e}")
+        return
+
+    # 3. إدارة المحادثة
     if "messages" not in st.session_state:
         st.session_state.messages = []
-
-    # سياق الشركة (هذا يوجه Gemini للرد بناءً على معلوماتك)
-    system_context = """
-    أنت المساعد الذكي لشركة MEDMEC Digital Solutions.
-    - مهمتك: مساعدة العملاء والإجابة على استفساراتهم باحترافية.
-    - معلومات الشركة:
-        1. الاسم: MEDMEC Digital Solutions.
-        2. الخدمات والأسعار: 
-           - Data Cleanse Pro: 8000 دج.
-           - CRM Automation: 9000 دج.
-           - الاستشارات التقنية: 2000 دج للساعة.
-    - القواعد: أجب باحترافية، وإذا سُئلت عن شيء غير متعلق بخدماتنا، اعتذر بلطف.
-    """
 
     for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input("اسألني عن فوائد أتمتة البيانات أو خدماتنا..."):
+    # 4. المعالجة
+    if prompt := st.chat_input("اسألني عن خدماتنا أو فوائد الأتمتة..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # دمج السياق مع سؤال المستخدم
-        full_query = f"{system_context} \n سؤال المستخدم: {prompt}"
-        
-        try:
-            response = model.generate_content(full_query)
-            answer = response.text
-        except Exception:
-            answer = "عذراً، أواجه مشكلة في الاتصال بالذكاء الاصطناعي حالياً."
+        system_context = """أنت مساعد ذكي لشركة MEDMEC Digital Solutions. 
+        الخدمات: Data Cleanse Pro (8000 دج)، CRM Automation (9000 دج)، الاستشارات التقنية (2000 دج للساعة).
+        أجب باحترافية واختصار."""
         
         with st.chat_message("assistant"):
-            st.markdown(answer)
-        st.session_state.messages.append({"role": "assistant", "content": answer})
+            with st.spinner("جاري التفكير..."):
+                try:
+                    response = model.generate_content(system_context + prompt)
+                    answer = response.text
+                    st.markdown(answer)
+                    st.session_state.messages.append({"role": "assistant", "content": answer})
+                except Exception as e:
+                    st.error("تعذر الحصول على رد من الذكاء الاصطناعي.")
+                    st.write(f"التفاصيل: {e}")
