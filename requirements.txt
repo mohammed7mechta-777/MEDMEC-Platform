@@ -4,3 +4,6 @@ groq
 openpyxl
 google-generativeai
 requests
+reportlab
+arabic-reshaper
+python-bidi
