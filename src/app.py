@@ -1,32 +1,43 @@
 import streamlit as st
-import pandas as pd
-import sys
-import os
-
-# هذا السطر يخبر بايثون أن يبحث عن الملفات في المجلد الحالي
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from cleaner import clean_data
 from agent import run_assistant
 
-st.set_page_config(page_title="MEDMEC Platform", page_icon="💼", layout="wide")
+# إعداد الصفحة
+st.set_page_config(page_title="MEDMEC Platform", page_icon="🤖", layout="wide")
 
-with st.sidebar:
+def show_welcome_screen():
+    st.title("🚀 أهلاً بك في منصة MEDMEC للذكاء الاصطناعي")
+    st.markdown("""
+    ### الحل الأمثل لأتمتة أعمالك بخصوصية تامة
+    نحن نوفر أدوات ذكية تعمل محلياً على جهازك لضمان سرعة فائقة وحماية كاملة لبياناتك.
+    
+    **مزايا منصتنا:**
+    * 🔒 **خصوصية مطلقة:** لا يتم إرسال بياناتك لأي سيرفر خارجي.
+    * ⚡ **سرعة فائقة:** معالجة محلية باستخدام نماذج الذكاء الاصطناعي الحديثة.
+    * 🛠 **أتمتة كاملة:** تحكم في عملياتك بضغطة زر.
+    """)
+    
+    if st.button("اضغط هنا للبدء في المحادثة"):
+        st.session_state.welcome_complete = True
+        st.rerun()
+
+# منطق الترحيب
+if "welcome_complete" not in st.session_state:
+    st.session_state.welcome_complete = False
+
+if not st.session_state.welcome_complete:
+    show_welcome_screen()
+else:
+    # القائمة الجانبية للخدمات
+    with st.sidebar:
+        st.header("🛠 خدماتنا")
+        if st.button("خدمة Data Cleanse Pro"):
+            st.session_state.messages.append({"role": "user", "content": "اشرح لي خدمة Data Cleanse Pro"})
+        if st.button("خدمة أتمتة CRM"):
+            st.session_state.messages.append({"role": "user", "content": "اشرح لي خدمة CRM Automation"})
+        st.divider()
+        if st.button("عودة للترحيب"):
+            st.session_state.welcome_complete = False
+            st.rerun()
+            
+    # تشغيل المساعد
     run_assistant()
-
-st.title("🧹 Data Cleanse Pro")
-st.write("أداة تنظيف البيانات الاحترافية لشركة MEDMEC")
-
-uploaded_file = st.file_uploader("ارفع ملف CSV هنا", type=['csv'])
-
-if uploaded_file:
-    if st.button("ابدأ التنظيف الآن"):
-        with st.spinner("جاري معالجة البيانات..."):
-            cleaned_df = clean_data(uploaded_file)
-            if cleaned_df is not None:
-                st.success("تم التنظيف بنجاح!")
-                st.dataframe(cleaned_df.head())
-                csv = cleaned_df.to_csv(index=False).encode('utf-8')
-                st.download_button("📥 تحميل الملف النظيف", csv, "cleaned_data.csv", "text/csv")
-            else:
-                st.error("حدث خطأ في معالجة الملف.")
