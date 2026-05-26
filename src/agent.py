@@ -1,37 +1,58 @@
 import streamlit as st
-import google.generativeai as genai
+import requests
+import subprocess
+
+def run_local_command(command):
+    """تنفيذ أوامر محلية عبر النظام (لأغراض الأتمتة)"""
+    try:
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        return result.stdout if result.stdout else result.stderr
+    except Exception as e:
+        return f"حدث خطأ أثناء تنفيذ الأمر: {str(e)}"
 
 def run_assistant():
-    st.subheader("🤖 مساعد MEDMEC الذكي")
-
-    # تشخيص حالة الـ Secrets
-    if "GOOGLE_API_KEY" not in st.secrets:
-        st.error("خطأ: لم يتم العثور على GOOGLE_API_KEY في الـ Secrets!")
-        return
+    st.title("🤖 منصة MEDMEC - الذكاء الاصطناعي المحلي")
     
-    api_key = st.secrets["GOOGLE_API_KEY"]
-    
-    try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+    # تهيئة حالة المحادثة
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-        for msg in st.session_state.messages:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+    # عرض الرسائل المخزنة
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-        if prompt := st.chat_input("اسألني عن خدماتنا..."):
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.markdown(prompt)
+    # مدخلات المستخدم
+    if prompt := st.chat_input("اطلب مني مهمة أو اسأل عن خدماتنا..."):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
+        # 1. تنفيذ الأوامر المحلية (أتمتة) إذا بدأ الأمر بـ 'run:'
+        if prompt.startswith("run:"):
+            cmd = prompt.replace("run:", "").strip()
             with st.chat_message("assistant"):
-                # محاولة الاتصال
-                response = model.generate_content(f"أنت مساعد شركة MEDMEC. أجب على: {prompt}")
-                st.markdown(response.text)
-                st.session_state.messages.append({"role": "assistant", "content": response.text})
-                
-    except Exception as e:
-        st.error(f"خطأ تقني في API: {str(e)}")
+                st.write(f"⚙️ جاري تنفيذ: `{cmd}`")
+                output = run_local_command(cmd)
+                st.code(output, language='bash')
+                st.session_state.messages.append({"role": "assistant", "content": f"النتيجة:\n{output}"})
+
+        # 2. الاستعلام من نموذج الذكاء الاصطناعي المحلي (Ollama)
+        else:
+            with st.chat_message("assistant"):
+                with st.spinner("جاري التفكير محلياً..."):
+                    try:
+                        # الربط مع Ollama
+                        payload = {
+                            "model": "qwen2.5:1.5b", 
+                            "prompt": f"أنت مساعد MEDMEC. خدماتنا: Data Cleanse Pro (8000 دج)، CRM (9000 دج). سياق: {prompt}",
+                            "stream": False
+                        }
+                        response = requests.post("http://localhost:11434/api/generate", json=payload)
+                        response_data = response.json()
+                        answer = response_data.get("response", "لم أتمكن من الحصول على رد.")
+                        
+                        st.markdown(answer)
+                        st.session_state.messages.append({"role": "assistant", "content": answer})
+                    except Exception as e:
+                        st.error("خطأ: تأكد أن سيرفر Ollama يعمل على المنفذ 11434!")
